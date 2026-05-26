@@ -9,9 +9,12 @@ async function bootstrap() {
   // Security headers (XSS, clickjacking, MIME sniffing, etc.)
   app.use(helmet());
 
-  // CORS — solo il frontend autorizzato
+  // CORS — frontend autorizzato (locale + produzione)
   app.enableCors({
-    origin: ['http://localhost:4200'],
+    origin: [
+      'http://localhost:4200',
+      process.env.FRONTEND_URL || '',
+    ].filter(Boolean),
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     maxAge: 3600,

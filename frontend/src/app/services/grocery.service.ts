@@ -1,6 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface ParsedRecipe {
   name: string;
@@ -50,7 +51,7 @@ export interface ProcessResponse {
   providedIn: 'root',
 })
 export class GroceryService {
-  private apiUrl = 'http://localhost:3000/api';
+  private apiUrl = environment.apiUrl;
 
   shoppingList = signal<Ingredient[]>([]);
   processedRecipes = signal<RecipeResult[]>([]);

@@ -12,6 +12,7 @@ export interface Ingredient {
   quantity: number;
   unit: string;
   category: string;
+  isDone?: boolean;
 }
 
 export interface ShoppingList {
@@ -89,6 +90,15 @@ export class GroceryService {
     return this.http
       .get<ShoppingList>(`${this.apiUrl}/shopping-list`)
       .pipe(tap((list) => this.shoppingList.set(list.items)));
+  }
+
+  toggleDone(ingredient: string) {
+    this.shoppingList.set(
+      this.shoppingList().map((i) =>
+        i.ingredient === ingredient ? { ...i, isDone: !i.isDone } : i
+      )
+    );
+    this.http.patch<ShoppingList>(`${this.apiUrl}/shopping-list/toggle-done`, { ingredient }).subscribe();
   }
 
   removeFromList(ingredient: string) {

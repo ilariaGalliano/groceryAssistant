@@ -13,10 +13,11 @@ export class ShoppingList extends Document {
         quantity: Number,
         unit: String,
         category: String,
+        isDone: { type: Boolean, default: false },
       },
     ],
   })
-  items: { ingredient: string; quantity: number; unit: string; category: string }[];
+  items: { ingredient: string; quantity: number; unit: string; category: string; isDone: boolean }[];
 }
 
 export const ShoppingListSchema = SchemaFactory.createForClass(ShoppingList);

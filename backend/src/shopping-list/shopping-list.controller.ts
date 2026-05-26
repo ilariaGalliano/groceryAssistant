@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body } from '@nestjs/common';
 import { ShoppingListService } from './shopping-list.service';
 
 @Controller('api/shopping-list')
@@ -13,5 +13,10 @@ export class ShoppingListController {
   @Get()
   async getLatest() {
     return this.shoppingListService.getLatest();
+  }
+
+  @Patch('toggle-done')
+  async toggleDone(@Body('ingredient') ingredient: string) {
+    return this.shoppingListService.toggleDone(ingredient);
   }
 }

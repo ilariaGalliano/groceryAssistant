@@ -32,4 +32,20 @@ export class ShoppingListService {
     }
     return { items: list.items, createdAt: list.createdAt };
   }
+
+  async toggleDone(ingredient: string) {
+    const list = await this.shoppingListModel
+      .findOne()
+      .sort({ createdAt: -1 })
+      .exec();
+
+    if (!list) return null;
+
+    const item = list.items.find((i) => i.ingredient === ingredient);
+    if (item) {
+      item.isDone = !item.isDone;
+      await list.save();
+    }
+    return { items: list.items, createdAt: list.createdAt };
+  }
 }

@@ -50,6 +50,10 @@ export class ShoppingListComponent implements OnInit {
     return this.categoryIcons[category] || '🛒';
   }
 
+  toggleDone(ingredient: string) {
+    this.groceryService.toggleDone(ingredient);
+  }
+
   removeItem(ingredient: string) {
     this.groceryService.removeFromList(ingredient);
   }

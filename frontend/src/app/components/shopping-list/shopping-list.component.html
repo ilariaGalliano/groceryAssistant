@@ -85,8 +85,17 @@
           </h3>
           <ul class="space-y-2">
             @for (item of groupedItems()[category]; track item.ingredient) {
-              <li class="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100 transition group hover:border-stone-200">
-                <span class="font-medium text-stone-800">{{ item.ingredient }}</span>
+              <li class="flex items-center justify-between p-3 bg-stone-50 rounded-xl border border-stone-100 transition group hover:border-stone-200"
+                  [class.opacity-50]="item.isDone">
+                <div class="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    [checked]="item.isDone"
+                    (change)="toggleDone(item.ingredient)"
+                    class="w-5 h-5 rounded border-stone-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                  />
+                  <span class="font-medium text-stone-800" [class.line-through]="item.isDone">{{ item.ingredient }}</span>
+                </div>
                 <div class="flex items-center gap-2">
                   <span class="text-sm text-stone-500 bg-white px-3 py-1 rounded-full shadow-sm border border-stone-100">
                     {{ item.quantity }} {{ item.unit }}

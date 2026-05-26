@@ -2,20 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { ExpressAdapter } from '@nestjs/platform-express';
-import express, { Express } from 'express';
-
-const server: Express = express();
-let app: any;
-
-async function createApp() {
-  const nestApp = await NestFactory.create(AppModule, new ExpressAdapter(server));
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
 
   // Security headers (XSS, clickjacking, MIME sniffing, etc.)
-  nestApp.use(helmet());
+  app.use(helmet());
 
   // CORS — frontend autorizzato (locale + produzione)
-  nestApp.enableCors({
+  app.enableCors({
     origin: [
       'http://localhost:4200',
       process.env.FRONTEND_URL || '',
@@ -26,7 +20,7 @@ async function createApp() {
   });
 
   // Validazione e sanitizzazione globale degli input
-  nestApp.useGlobalPipes(
+  app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
@@ -34,22 +28,10 @@ async function createApp() {
     }),
   );
 
-  await nestApp.init();
-  return nestApp;
+  await app.listen(process.env.PORT ?? 3000);
 }
 
-// Per Vercel serverless
-export default async function handler(req: any, res: any) {
-  if (!app) {
-    app = await createApp();
-  }
-  server(req, res);
-}
-
-// Per sviluppo locale
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
-  createApp().then(async (nestApp) => {
-    await nestApp.listen(process.env.PORT ?? 3000);
-    console.log(`🚀 Server running on http://localhost:${process.env.PORT ?? 3000}`);
-  });
+// Avvio locale/tradizionale. Su Vercel viene usato backend/api/index.ts.
+if (!process.env.VERCEL) {
+  void bootstrap();
 }

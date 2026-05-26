@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { RecipesModule } from './recipes/recipes.module';
 import { ShoppingListModule } from './shopping-list/shopping-list.module';
 import { AiModule } from './ai/ai.module';
+import { AuthModule } from './auth/auth.module';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
 @Module({
@@ -30,6 +31,7 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
     RecipesModule,
     ShoppingListModule,
     AiModule,
+    AuthModule,
   ],
 })
 export class AppModule {}

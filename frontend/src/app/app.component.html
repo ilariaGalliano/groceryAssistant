@@ -1,12 +1,12 @@
 <div class="min-h-screen bg-stone-50">
   <!-- Header -->
+  @if (authService.isLoggedIn()) {
   <header class="bg-emerald-800 text-white shadow-lg">
     <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <img src="assets/logo_efl.png" alt="FoodEasyList" class="h-10 w-auto rounded bg-white/90 p-1">
-        <!-- <span class="text-xl font-bold tracking-tight">FoodEasyList</span> -->
       </div>
-      <nav class="flex gap-1">
+      <nav class="flex gap-1 items-center">
         <a routerLink="/recipes" routerLinkActive="bg-emerald-900"
            class="hover:bg-emerald-700 rounded-lg px-3 py-2 transition text-lg" title="Ricette">
           🍳
@@ -19,9 +19,13 @@
            class="hover:bg-emerald-700 rounded-lg px-3 py-2 transition text-lg" title="Lista Spesa">
           🛒
         </a>
+        <button (click)="logout()" class="ml-3 hover:bg-emerald-700 rounded-lg px-3 py-2 transition text-lg" title="Esci">
+          🚪
+        </button>
       </nav>
     </div>
   </header>
+  }
 
   <!-- Content -->
   <main class="max-w-4xl mx-auto px-4 py-8">

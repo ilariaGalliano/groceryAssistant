@@ -1,8 +1,10 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
 import { AiService } from '../ai/ai.service';
 import { RecipesService } from './recipes.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('api/recipes')
+@UseGuards(JwtAuthGuard)
 export class RecipesController {
   constructor(
     private aiService: AiService,

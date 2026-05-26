@@ -1,7 +1,9 @@
-import { Controller, Post, Get, Patch, Body } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Body, UseGuards } from '@nestjs/common';
 import { ShoppingListService } from './shopping-list.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('api/shopping-list')
+@UseGuards(JwtAuthGuard)
 export class ShoppingListController {
   constructor(private shoppingListService: ShoppingListService) {}
 

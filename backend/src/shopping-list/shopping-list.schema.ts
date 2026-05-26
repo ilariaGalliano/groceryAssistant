@@ -17,7 +17,7 @@ export class ShoppingList extends Document {
       },
     ],
   })
-  items: { ingredient: string; quantity: number; unit: string; category: string; isDone: boolean }[];
+  items!: { ingredient: string; quantity: number; unit: string; category: string; isDone: boolean }[];
 }
 
 export const ShoppingListSchema = SchemaFactory.createForClass(ShoppingList);

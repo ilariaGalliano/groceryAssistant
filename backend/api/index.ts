@@ -37,16 +37,18 @@ const isOriginAllowed = (origin?: string): boolean => {
 const bootstrap = async () => {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
 
-  app.use(helmet());
-
+  // CORS must be enabled BEFORE helmet and other middlewares
   app.enableCors({
     origin: (origin, callback) => {
       callback(null, isOriginAllowed(origin));
     },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
     maxAge: 3600,
   });
+
+  app.use(helmet());
 
   app.useGlobalPipes(
     new ValidationPipe({

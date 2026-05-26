@@ -1,24 +1,21 @@
 import { Controller, Post, Body } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
+import { RegisterDto, LoginDto } from './dto/auth.dto';
 
 @Controller('api/auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  async register(
-    @Body('email') email: string,
-    @Body('password') password: string,
-    @Body('name') name?: string,
-  ) {
-    return this.authService.register(email, password, name);
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto.email, dto.password, dto.name);
   }
 
   @Post('login')
-  async login(
-    @Body('email') email: string,
-    @Body('password') password: string,
-  ) {
-    return this.authService.login(email, password);
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
+  async login(@Body() dto: LoginDto) {
+    return this.authService.login(dto.email, dto.password);
   }
 }

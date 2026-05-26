@@ -1,6 +1,7 @@
 import { Controller, Post, Get, Patch, Body, UseGuards } from '@nestjs/common';
 import { ShoppingListService } from './shopping-list.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { GenerateListDto, ToggleDoneDto } from '../common/dto/input.dto';
 
 @Controller('api/shopping-list')
 @UseGuards(JwtAuthGuard)
@@ -8,8 +9,8 @@ export class ShoppingListController {
   constructor(private shoppingListService: ShoppingListService) {}
 
   @Post('generate')
-  async generate(@Body('recipes') recipes: { name: string; people: number }[]) {
-    return this.shoppingListService.generate(recipes);
+  async generate(@Body() dto: GenerateListDto) {
+    return this.shoppingListService.generate(dto.recipes);
   }
 
   @Get()
@@ -18,7 +19,7 @@ export class ShoppingListController {
   }
 
   @Patch('toggle-done')
-  async toggleDone(@Body('ingredient') ingredient: string) {
-    return this.shoppingListService.toggleDone(ingredient);
+  async toggleDone(@Body() dto: ToggleDoneDto) {
+    return this.shoppingListService.toggleDone(dto.ingredient);
   }
 }

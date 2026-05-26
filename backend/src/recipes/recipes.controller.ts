@@ -2,6 +2,7 @@ import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
 import { AiService } from '../ai/ai.service';
 import { RecipesService } from './recipes.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { TextInputDto } from '../common/dto/input.dto';
 
 @Controller('api/recipes')
 @UseGuards(JwtAuthGuard)
@@ -12,8 +13,8 @@ export class RecipesController {
   ) {}
 
   @Post('parse')
-  async parseRecipes(@Body('text') text: string) {
-    return this.aiService.parseRecipes(text);
+  async parseRecipes(@Body() dto: TextInputDto) {
+    return this.aiService.parseRecipes(dto.text);
   }
 
   /**
@@ -24,16 +25,16 @@ export class RecipesController {
    * 4. Ritorna dati per UI dinamica
    */
   @Post('process')
-  async processRequest(@Body('text') text: string) {
-    return this.recipesService.processRequest(text);
+  async processRequest(@Body() dto: TextInputDto) {
+    return this.recipesService.processRequest(dto.text);
   }
 
   /**
    * Cerca ricette semanticamente simili via Vector Search
    */
   @Post('search')
-  async searchSimilar(@Body('text') text: string) {
-    return this.recipesService.searchSimilar(text);
+  async searchSimilar(@Body() dto: TextInputDto) {
+    return this.recipesService.searchSimilar(dto.text);
   }
 
   @Get()

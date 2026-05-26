@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { RecipesModule } from './recipes/recipes.module';
 import { ShoppingListModule } from './shopping-list/shopping-list.module';
 import { AiModule } from './ai/ai.module';
@@ -10,6 +12,8 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    // Rate limiting globale: max 60 richieste per minuto per IP
+    ThrottlerModule.forRoot({ throttlers: [{ ttl: 60000, limit: 60 }] }),
     MongooseModule.forRootAsync({
       inject: [ConfigService],
       useFactory: async (config: ConfigService) => {
@@ -32,6 +36,9 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
     ShoppingListModule,
     AiModule,
     AuthModule,
+  ],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}

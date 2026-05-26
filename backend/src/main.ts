@@ -8,16 +8,21 @@ const allowedOrigins = [
   process.env.FRONTEND_PREVIEW_URL || '',
 ].filter(Boolean);
 
+const normalizeOrigin = (value: string): string => value.trim().replace(/\/$/, '');
+
 const isOriginAllowed = (origin?: string): boolean => {
   if (!origin) {
     return true;
   }
 
-  if (process.env.NODE_ENV !== 'production' && origin === 'http://localhost:4200') {
+  const normalizedOrigin = normalizeOrigin(origin);
+
+  if (process.env.NODE_ENV !== 'production' && normalizedOrigin === 'http://localhost:4200') {
     return true;
   }
 
-  if (allowedOrigins.includes(origin)) {
+  const normalizedAllowedOrigins = allowedOrigins.map(normalizeOrigin);
+  if (normalizedAllowedOrigins.includes(normalizedOrigin)) {
     return true;
   }
 

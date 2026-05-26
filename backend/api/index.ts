@@ -8,6 +8,27 @@ import serverless from 'serverless-http';
 
 let cachedHandler: ReturnType<typeof serverless> | null = null;
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL || '',
+  process.env.FRONTEND_PREVIEW_URL || '',
+].filter(Boolean);
+
+const isOriginAllowed = (origin?: string): boolean => {
+  if (!origin) {
+    return true;
+  }
+
+  if (process.env.NODE_ENV !== 'production' && origin === 'http://localhost:4200') {
+    return true;
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  return false;
+};
+
 const bootstrap = async () => {
   const expressApp = express();
   const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
@@ -15,8 +36,10 @@ const bootstrap = async () => {
   app.use(helmet());
 
   app.enableCors({
-    origin: ['http://localhost:4200', process.env.FRONTEND_URL || ''].filter(Boolean),
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    origin: (origin, callback) => {
+      callback(null, isOriginAllowed(origin));
+    },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     maxAge: 3600,
   });

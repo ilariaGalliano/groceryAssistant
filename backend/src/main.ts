@@ -2,6 +2,28 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
+
+const allowedOrigins = [
+  process.env.FRONTEND_URL || '',
+  process.env.FRONTEND_PREVIEW_URL || '',
+].filter(Boolean);
+
+const isOriginAllowed = (origin?: string): boolean => {
+  if (!origin) {
+    return true;
+  }
+
+  if (process.env.NODE_ENV !== 'production' && origin === 'http://localhost:4200') {
+    return true;
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  return false;
+};
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
@@ -10,11 +32,10 @@ async function bootstrap() {
 
   // CORS — frontend autorizzato (locale + produzione)
   app.enableCors({
-    origin: [
-      'http://localhost:4200',
-      process.env.FRONTEND_URL || '',
-    ].filter(Boolean),
-    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    origin: (origin, callback) => {
+      callback(null, isOriginAllowed(origin));
+    },
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     maxAge: 3600,
   });

@@ -1,58 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
+import { RECIPES_DATASET, findRecipeByName, generateEmbeddingText, RecipeData } from '../data/recipes-dataset';
 
 @Injectable()
 export class AiService {
   private openai: OpenAI | null = null;
-
-  // Database mock di ricette italiane per sviluppo senza API key
-  private mockRecipes: Record<string, { ingredient: string; quantity: number; unit: string; category: string }[]> = {
-    carbonara: [
-      { ingredient: 'spaghetti', quantity: 400, unit: 'g', category: 'pasta' },
-      { ingredient: 'guanciale', quantity: 200, unit: 'g', category: 'carne' },
-      { ingredient: 'uova', quantity: 4, unit: 'pz', category: 'latticini' },
-      { ingredient: 'pecorino romano', quantity: 100, unit: 'g', category: 'latticini' },
-      { ingredient: 'pepe nero', quantity: 2, unit: 'cucchiaini', category: 'spezie' },
-    ],
-    tiramisu: [
-      { ingredient: 'mascarpone', quantity: 500, unit: 'g', category: 'latticini' },
-      { ingredient: 'uova', quantity: 4, unit: 'pz', category: 'latticini' },
-      { ingredient: 'savoiardi', quantity: 300, unit: 'g', category: 'altro' },
-      { ingredient: 'caffè espresso', quantity: 300, unit: 'ml', category: 'altro' },
-      { ingredient: 'zucchero', quantity: 100, unit: 'g', category: 'altro' },
-      { ingredient: 'cacao amaro', quantity: 30, unit: 'g', category: 'altro' },
-    ],
-    lasagna: [
-      { ingredient: 'lasagne fresche', quantity: 500, unit: 'g', category: 'pasta' },
-      { ingredient: 'ragù di carne', quantity: 500, unit: 'g', category: 'carne' },
-      { ingredient: 'besciamella', quantity: 500, unit: 'ml', category: 'latticini' },
-      { ingredient: 'parmigiano', quantity: 150, unit: 'g', category: 'latticini' },
-      { ingredient: 'mozzarella', quantity: 200, unit: 'g', category: 'latticini' },
-    ],
-    'amatriciana': [
-      { ingredient: 'spaghetti', quantity: 400, unit: 'g', category: 'pasta' },
-      { ingredient: 'guanciale', quantity: 150, unit: 'g', category: 'carne' },
-      { ingredient: 'pomodori pelati', quantity: 400, unit: 'g', category: 'verdure' },
-      { ingredient: 'pecorino romano', quantity: 80, unit: 'g', category: 'latticini' },
-      { ingredient: 'peperoncino', quantity: 1, unit: 'pz', category: 'spezie' },
-    ],
-    'pesto': [
-      { ingredient: 'trofie', quantity: 400, unit: 'g', category: 'pasta' },
-      { ingredient: 'basilico fresco', quantity: 80, unit: 'g', category: 'verdure' },
-      { ingredient: 'pinoli', quantity: 30, unit: 'g', category: 'altro' },
-      { ingredient: 'parmigiano', quantity: 60, unit: 'g', category: 'latticini' },
-      { ingredient: 'aglio', quantity: 1, unit: 'spicchio', category: 'verdure' },
-      { ingredient: 'olio extravergine', quantity: 80, unit: 'ml', category: 'altro' },
-    ],
-  };
 
   constructor(private configService: ConfigService) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     if (apiKey && !apiKey.includes('your-openai')) {
       this.openai = new OpenAI({ apiKey });
     } else {
-      console.log('⚠️  OpenAI API key non configurata. Uso mock AI per sviluppo.');
+      console.log('⚠️  OpenAI API key non configurata. Uso mock AI con golden dataset.');
     }
   }
 
@@ -119,14 +79,38 @@ IMPORTANTE: Se lo stesso ingrediente appare in più ricette, SOMMA le quantità 
 
   private mockParseRecipes(text: string): { name: string; people: number }[] {
     const recipes: { name: string; people: number }[] = [];
-    const lower = text.toLowerCase();
+    const lower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    const knownRecipes = ['carbonara', 'tiramisu', 'tiramisù', 'lasagna', 'amatriciana', 'pesto'];
-    for (const name of knownRecipes) {
-      if (lower.includes(name)) {
-        const peopleMatch = lower.match(new RegExp(`${name}[^0-9]*?(\\d+)\\s*person`));
-        const people = peopleMatch ? parseInt(peopleMatch[1]) : 4;
-        recipes.push({ name: name.charAt(0).toUpperCase() + name.slice(1), people });
+    // Cerca numero di persone nel testo
+    const peopleMatch = lower.match(/(\d+)\s*person[ei]?/);
+    const people = peopleMatch ? parseInt(peopleMatch[1]) : 4;
+
+    // Cerca TUTTE le ricette dal golden dataset
+    for (const datasetRecipe of RECIPES_DATASET) {
+      const recipeName = datasetRecipe.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      // Match esatto o parziale
+      if (lower.includes(recipeName) || recipeName.split(' ').some(word => word.length > 4 && lower.includes(word))) {
+        // Evita duplicati
+        if (!recipes.some(r => r.name === datasetRecipe.name)) {
+          recipes.push({ name: datasetRecipe.name, people });
+        }
+      }
+    }
+
+    // Se non troviamo ricette note, cerchiamo pattern "cucinare/fare una/un [ricetta]"
+    if (recipes.length === 0) {
+      const recipePattern = lower.match(/(?:cucinare|fare|preparare)\s+(?:una?|il|la|lo)\s+([a-z]+(?:\s+[a-z']+)?)/i);
+      if (recipePattern) {
+        const extractedName = recipePattern[1];
+        // Cerca nel dataset
+        const found = findRecipeByName(extractedName);
+        if (found) {
+          recipes.push({ name: found.name, people });
+        } else {
+          // Nome non trovato, usa il nome estratto
+          const name = extractedName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+          recipes.push({ name, people });
+        }
       }
     }
 
@@ -142,16 +126,28 @@ IMPORTANTE: Se lo stesso ingrediente appare in più ricette, SOMMA le quantità 
     const merged: Record<string, { ingredient: string; quantity: number; unit: string; category: string }> = {};
 
     for (const recipe of recipes) {
-      const key = recipe.name.toLowerCase().replace('ù', 'u');
-      const baseIngredients = this.mockRecipes[key] || this.mockRecipes['carbonara'];
-      const scale = recipe.people / 4;
+      // Cerca nel golden dataset
+      const datasetRecipe = findRecipeByName(recipe.name);
+      
+      if (!datasetRecipe) {
+        console.warn(`⚠️  Ricetta "${recipe.name}" non trovata nel dataset. Usa fallback generico.`);
+        // Fallback: restituisci ingredienti generici per ricetta sconosciuta
+        return [
+          { ingredient: 'ingrediente principale', quantity: 500, unit: 'g', category: 'altro' },
+          { ingredient: 'condimento', quantity: 100, unit: 'g', category: 'altro' },
+        ];
+      }
 
-      for (const ing of baseIngredients) {
+      const scale = recipe.people / datasetRecipe.basePeople;
+
+      for (const ing of datasetRecipe.ingredients) {
         const id = ing.ingredient;
+        const scaledQuantity = Math.round(ing.quantity * scale);
+        
         if (merged[id]) {
-          merged[id].quantity += Math.round(ing.quantity * scale);
+          merged[id].quantity += scaledQuantity;
         } else {
-          merged[id] = { ...ing, quantity: Math.round(ing.quantity * scale) };
+          merged[id] = { ...ing, quantity: scaledQuantity };
         }
       }
     }

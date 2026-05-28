@@ -73,4 +73,19 @@ export class ShoppingListComponent implements OnInit {
   updateNewItem(field: string, value: any) {
     this.newItem.set({ ...this.newItem(), [field]: value });
   }
+
+  clearAll() {
+    if (confirm('Vuoi davvero eliminare TUTTA la lista della spesa?\n\nQuesta azione è irreversibile!')) {
+      this.groceryService.clearAll().subscribe({
+        next: () => {
+          console.log('Lista eliminata con successo');
+        },
+        error: (err) => {
+          console.error('Errore eliminazione lista:', err);
+          // Ricarica la lista in caso di errore
+          this.groceryService.getShoppingList().subscribe();
+        }
+      });
+    }
+  }
 }

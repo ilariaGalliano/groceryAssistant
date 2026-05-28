@@ -2,16 +2,27 @@
   <div class="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-stone-200 p-6">
     <div class="flex items-center justify-between mb-4">
       <h2 class="text-2xl font-bold text-stone-800">🛒 Lista della Spesa</h2>
-      <button
-        type="button"
-        (click)="toggleAddForm()"
-        [class]="showAddForm()
-          ? 'bg-stone-200 text-stone-600'
-          : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'"
-        class="px-3 py-1.5 rounded-lg text-sm font-medium transition"
-      >
-        @if (showAddForm()) { ✕ Chiudi } @else { + Aggiungi }
-      </button>
+      <div class="flex gap-2">
+        @if (items().length > 0) {
+          <button
+            type="button"
+            (click)="clearAll()"
+            class="px-3 py-1.5 rounded-lg text-sm font-medium transition bg-red-50 text-red-600 hover:bg-red-100"
+          >
+            🗑️ Elimina tutto
+          </button>
+        }
+        <button
+          type="button"
+          (click)="toggleAddForm()"
+          [class]="showAddForm()
+            ? 'bg-stone-200 text-stone-600'
+            : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'"
+          class="px-3 py-1.5 rounded-lg text-sm font-medium transition"
+        >
+          @if (showAddForm()) { ✕ Chiudi } @else { + Aggiungi }
+        </button>
+      </div>
     </div>
 
     <!-- Add Item Form -->

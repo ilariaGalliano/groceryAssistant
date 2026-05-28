@@ -148,7 +148,7 @@
       <!-- Submit -->
       <button
         type="submit"
-        [disabled]="loading()"
+        [disabled]="loading() || !userInput().trim()"
         class="w-full bg-emerald-700 text-white font-semibold py-3 px-6 rounded-xl hover:bg-emerald-800 transition disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
       >
         @if (loading()) {
@@ -194,12 +194,20 @@
 
       <!-- Tab: Ricette Originali -->
       @if (activeTab() === 'original') {
-        @for (result of recipeResults(); track result.original.name) {
+        @for (result of recipeResults(); track result.original.name; let i = $index) {
           <div class="mb-6 p-4 bg-emerald-50/50 rounded-xl border border-emerald-100">
             <h3 class="text-lg font-bold text-stone-800 flex items-center gap-2">
               <span>📋</span>
-              <span>{{ result.original.name }}</span>
+              <span class="flex-1">{{ result.original.name }}</span>
               <span class="text-sm font-normal text-stone-500">👥 {{ result.original.people }} persone</span>
+              <button
+                type="button"
+                (click)="removeRecipe(i)"
+                class="ml-2 w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 flex items-center justify-center transition"
+                title="Rimuovi questa ricetta"
+              >
+                ✕
+              </button>
             </h3>
             <ul class="mt-3 space-y-1">
               @for (ing of result.original.ingredients; track ing.ingredient) {
@@ -215,11 +223,19 @@
 
       <!-- Tab: Versione Vegetariana -->
       @if (activeTab() === 'vegetarian') {
-        @for (result of recipeResults(); track result.vegetarianVersion.name) {
+        @for (result of recipeResults(); track result.vegetarianVersion.name; let i = $index) {
           <div class="mb-6 p-4 bg-emerald-50/70 rounded-xl border border-emerald-200">
             <h3 class="text-lg font-bold text-emerald-800 flex items-center gap-2">
               <span>🌱</span>
-              <span>{{ result.vegetarianVersion.name }}</span>
+              <span class="flex-1">{{ result.vegetarianVersion.name }}</span>
+              <button
+                type="button"
+                (click)="removeRecipe(i)"
+                class="ml-2 w-8 h-8 rounded-full bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 flex items-center justify-center transition"
+                title="Rimuovi questa ricetta"
+              >
+                ✕
+              </button>
             </h3>
             <p class="text-sm text-emerald-600 mt-1 mb-3">{{ result.vegetarianVersion.description }}</p>
             <ul class="space-y-1">
@@ -236,9 +252,19 @@
 
       <!-- Tab: Ricette Simili (Vector Search) -->
       @if (activeTab() === 'similar') {
-        @for (result of recipeResults(); track result.original.name) {
+        @for (result of recipeResults(); track result.original.name; let i = $index) {
           <div class="mb-4">
-            <h4 class="text-sm font-semibold text-stone-500 mb-2">Simili a "{{ result.original.name }}":</h4>
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-semibold text-stone-500">Simili a "{{ result.original.name }}":</h4>
+              <button
+                type="button"
+                (click)="removeRecipe(i)"
+                class="w-7 h-7 rounded-full bg-red-50 hover:bg-red-100 text-red-500 hover:text-red-700 flex items-center justify-center transition text-sm"
+                title="Rimuovi questa ricetta"
+              >
+                ✕
+              </button>
+            </div>
             @if (result.similarRecipes.length === 0) {
               <p class="text-stone-400 text-sm italic">Nessuna ricetta simile trovata. Aggiungi più ricette per attivare Vector Search!</p>
             } @else {

@@ -141,6 +141,23 @@ export class RecipeInputComponent {
       next: (response) => {
         this.recipeResults.set(response.recipes);
         this.loading.set(false);
+        
+        // Se l'utente cerca ricetta vegetariana/vegana o ha selezionato dieta, mostra tab vegetariano
+        const diets = this.selectedDiets();
+        const input = this.userInput().toLowerCase();
+        const isVegetarianSearch = 
+          diets.includes('vegetariano') || 
+          diets.includes('vegano') ||
+          input.includes('vegetarian') ||
+          input.includes('vegano') ||
+          input.includes('vegana') ||
+          input.includes('vegan');
+        
+        if (isVegetarianSearch) {
+          this.activeTab.set('vegetarian');
+        } else {
+          this.activeTab.set('original');
+        }
       },
       error: () => {
         this.error.set('Errore nel processamento delle ricette. Riprova.');
@@ -149,13 +166,56 @@ export class RecipeInputComponent {
     });
   }
 
-  generateShoppingList() {
+  generateShoppingList(replaceList: boolean = false) {
+    // Se la lista esistente non è vuota e non è già stata scelta l'opzione, chiedi all'utente
+    const existingItems = this.groceryService.shoppingList();
+    if (!replaceList && existingItems.length > 0) {
+      const choice = confirm(
+        '📋 Hai già una lista della spesa esistente.\n\n' +
+        'Vuoi SOSTITUIRE la lista esistente con questa nuova?\n\n' +
+        '• OK = Sostituisci (cancella vecchia lista)\n' +
+        '• Annulla = Aggiungi alla lista esistente'
+      );
+      if (choice) {
+        // L'utente ha scelto di sostituire
+        this.generateShoppingList(true);
+        return;
+      }
+      // Altrimenti continua con append
+    }
+    
     this.loading.set(true);
-    const recipes = this.recipeResults().map((r) => ({
-      name: r.original.name,
-      people: r.original.people,
-    }));
-    this.groceryService.generateShoppingList(recipes).subscribe({
+    
+    // Usa la versione vegetariana se:
+    // 1. L'utente sta visualizzando il tab vegetariano
+    // 2. Oppure ha selezionato dieta vegetariana/vegana
+    // 3. Oppure ha cercato "vegetariana/vegana" nel testo
+    const diets = this.selectedDiets();
+    const input = this.userInput().toLowerCase();
+    const useVegetarian = 
+      this.activeTab() === 'vegetarian' ||
+      diets.includes('vegetariano') || 
+      diets.includes('vegano') ||
+      input.includes('vegetarian') ||
+      input.includes('vegano') ||
+      input.includes('vegana') ||
+      input.includes('vegan');
+    
+    const recipes = this.recipeResults().map((r) => {
+      if (useVegetarian && r.vegetarianVersion) {
+        return {
+          name: r.vegetarianVersion.name,
+          people: r.original.people,
+        };
+      }
+      return {
+        name: r.original.name,
+        people: r.original.people,
+      };
+    });
+    
+    const append = !replaceList;
+    this.groceryService.generateShoppingList(recipes, append).subscribe({
       next: () => {
         this.loading.set(false);
       },
@@ -168,5 +228,10 @@ export class RecipeInputComponent {
 
   setTab(tab: 'original' | 'vegetarian' | 'similar') {
     this.activeTab.set(tab);
+  }
+
+  removeRecipe(index: number) {
+    const current = this.recipeResults();
+    this.recipeResults.set(current.filter((_, i) => i !== index));
   }
 }

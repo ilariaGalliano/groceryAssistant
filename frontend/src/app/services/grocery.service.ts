@@ -81,9 +81,9 @@ export class GroceryService {
     return this.http.post<any[]>(`${this.apiUrl}/recipes/search`, { text });
   }
 
-  generateShoppingList(recipes: ParsedRecipe[]): Observable<ShoppingList> {
+  generateShoppingList(recipes: ParsedRecipe[], append: boolean = true): Observable<ShoppingList> {
     return this.http
-      .post<ShoppingList>(`${this.apiUrl}/shopping-list/generate`, { recipes })
+      .post<ShoppingList>(`${this.apiUrl}/shopping-list/generate`, { recipes, append })
       .pipe(tap((list) => this.shoppingList.set(list.items)));
   }
 
@@ -104,6 +104,7 @@ export class GroceryService {
 
   removeFromList(ingredient: string) {
     this.shoppingList.set(this.shoppingList().filter((i) => i.ingredient !== ingredient));
+    this.http.patch(`${this.apiUrl}/shopping-list/remove-item`, { ingredient }).subscribe();
   }
 
   addToList(item: Ingredient) {
@@ -117,5 +118,10 @@ export class GroceryService {
     } else {
       this.shoppingList.set([...this.shoppingList(), item]);
     }
+  }
+
+  clearAll(): Observable<{ items: never[], createdAt: null }> {
+    this.shoppingList.set([]);
+    return this.http.delete<{ items: never[], createdAt: null }>(`${this.apiUrl}/shopping-list`);
   }
 }

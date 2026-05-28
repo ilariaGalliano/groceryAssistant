@@ -84,4 +84,23 @@ export class ShoppingListService {
     }
     return { items: list.items, createdAt: list.createdAt };
   }
+
+  async removeItem(ingredient: string) {
+    const list = await this.shoppingListModel
+      .findOne()
+      .sort({ createdAt: -1 })
+      .exec();
+
+    if (!list) return null;
+
+    list.items = list.items.filter((i) => i.ingredient !== ingredient);
+    await list.save();
+    
+    return { items: list.items, createdAt: list.createdAt };
+  }
+
+  async clearAll() {
+    await this.shoppingListModel.deleteMany({});
+    return { items: [], createdAt: null };
+  }
 }

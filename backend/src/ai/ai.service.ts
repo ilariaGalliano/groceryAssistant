@@ -60,7 +60,10 @@ Rispondi SOLO con un JSON array. Ogni elemento ha:
 - "unit": unità di misura (g, ml, pz, cucchiai, ecc.)
 - "category": categoria (carne, latticini, verdure, pasta, spezie, frutta, pesce, altro)
 
-IMPORTANTE: Se lo stesso ingrediente appare in più ricette, SOMMA le quantità e restituiscilo una sola volta.`,
+REGOLE IMPORTANTI:
+1. Se lo stesso ingrediente appare in più ricette, SOMMA le quantità e restituiscilo una sola volta.
+2. Se il nome ricetta contiene "Vegetariana" o "Vegetariano": NON includere MAI carne (guanciale, pancetta, prosciutto, salsiccia, ecc.) o pesce. Usa alternative vegetariane (es: zucchine grigliate, funghi, tofu affumicato).
+3. Se il nome ricetta contiene "Vegana" o "Vegano": NON includere MAI prodotti animali (carne, pesce, uova, latticini, burro, formaggio). Usa alternative vegane.`,
             },
             { role: 'user', content: JSON.stringify(recipes) },
           ],
@@ -125,12 +128,32 @@ IMPORTANTE: Se lo stesso ingrediente appare in più ricette, SOMMA le quantità 
   ): { ingredient: string; quantity: number; unit: string; category: string }[] {
     const merged: Record<string, { ingredient: string; quantity: number; unit: string; category: string }> = {};
 
+    // Ingredienti da escludere per versioni vegetariane/vegane
+    const meatIngredients = ['guanciale', 'pancetta', 'prosciutto', 'salsiccia', 'bacon', 'lardo', 'speck', 'bresaola', 'salame'];
+    const animalIngredients = [...meatIngredients, 'uova', 'uovo', 'parmigiano', 'pecorino', 'grana', 'burro', 'panna', 'latte', 'mozzarella', 'ricotta'];
+    
+    // Sostituzioni vegetariane
+    const vegetarianReplacements: Record<string, { ingredient: string; quantity: number; unit: string; category: string }> = {
+      'guanciale': { ingredient: 'zucchine grigliate', quantity: 200, unit: 'g', category: 'verdure' },
+      'pancetta': { ingredient: 'funghi champignon', quantity: 200, unit: 'g', category: 'verdure' },
+      'prosciutto': { ingredient: 'zucchine', quantity: 150, unit: 'g', category: 'verdure' },
+    };
+
     for (const recipe of recipes) {
-      // Cerca nel golden dataset
-      const datasetRecipe = findRecipeByName(recipe.name);
+      const recipeLower = recipe.name.toLowerCase();
+      const isVegetarian = recipeLower.includes('vegetarian') || recipeLower.includes('vegano') || recipeLower.includes('vegana');
+      const isVegan = recipeLower.includes('vegano') || recipeLower.includes('vegana') || recipeLower.includes('vegan');
+      
+      // Rimuovi suffissi per trovare la ricetta base
+      const baseName = recipe.name
+        .replace(/\s*(vegetarian[ao]?|vegan[ao]?)\s*/gi, '')
+        .trim();
+      
+      // Cerca nel golden dataset (prima nome completo, poi nome base)
+      let datasetRecipe = findRecipeByName(recipe.name) || findRecipeByName(baseName);
       
       if (!datasetRecipe) {
-        console.warn(`⚠️  Ricetta "${recipe.name}" non trovata nel dataset. Usa fallback generico.`);
+        console.warn(`⚠️  Ricetta "${recipe.name}" (base: "${baseName}") non trovata nel dataset. Usa fallback generico.`);
         // Fallback: restituisci ingredienti generici per ricetta sconosciuta
         return [
           { ingredient: 'ingrediente principale', quantity: 500, unit: 'g', category: 'altro' },
@@ -141,6 +164,25 @@ IMPORTANTE: Se lo stesso ingrediente appare in più ricette, SOMMA le quantità 
       const scale = recipe.people / datasetRecipe.basePeople;
 
       for (const ing of datasetRecipe.ingredients) {
+        const ingLower = ing.ingredient.toLowerCase();
+        const excludeList = isVegan ? animalIngredients : (isVegetarian ? meatIngredients : []);
+        
+        // Salta ingredienti non permessi
+        if (excludeList.some(excluded => ingLower.includes(excluded))) {
+          // Aggiungi sostituto se disponibile
+          const replacement = vegetarianReplacements[ingLower];
+          if (replacement && !isVegan) {
+            const id = replacement.ingredient;
+            const scaledQuantity = Math.round(replacement.quantity * scale);
+            if (merged[id]) {
+              merged[id].quantity += scaledQuantity;
+            } else {
+              merged[id] = { ...replacement, quantity: scaledQuantity };
+            }
+          }
+          continue;
+        }
+        
         const id = ing.ingredient;
         const scaledQuantity = Math.round(ing.quantity * scale);
         

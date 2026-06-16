@@ -27,19 +27,23 @@ export interface VegetarianVersion {
   ingredients: Ingredient[];
 }
 
+export interface SimilarRecipe {
+  _id?: string;
+  name: string;
+  people: number;
+  ingredients: Ingredient[];
+  description: string;
+  isVegetarian: boolean;
+  score?: number;
+}
+
 export interface RecipeResult {
   original: {
     name: string;
     people: number;
     ingredients: Ingredient[];
   };
-  similarRecipes: {
-    name: string;
-    ingredients: Ingredient[];
-    description: string;
-    isVegetarian: boolean;
-    score?: number;
-  }[];
+  similarRecipes: SimilarRecipe[];
   vegetarianVersion: VegetarianVersion;
 }
 

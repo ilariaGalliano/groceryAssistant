@@ -1,41 +1,38 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import OpenAI from 'openai';
+import { GoogleGenerativeAI, GenerativeModel } from '@google/generative-ai';
 import { RECIPES_DATASET, findRecipeByName, generateEmbeddingText, RecipeData } from '../data/recipes-dataset';
 
 @Injectable()
 export class AiService {
-  private openai: OpenAI | null = null;
+  private gemini: GenerativeModel | null = null;
+  private genAI: GoogleGenerativeAI | null = null;
 
   constructor(private configService: ConfigService) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
-    if (apiKey && !apiKey.includes('your-openai')) {
-      this.openai = new OpenAI({ apiKey });
+    const apiKey = this.configService.get<string>('GEMINI_API_KEY');
+    if (apiKey && apiKey.length > 10) {
+      this.genAI = new GoogleGenerativeAI(apiKey);
+      this.gemini = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      console.log('✅ Gemini AI configurato correttamente.');
     } else {
-      console.log('⚠️  OpenAI API key non configurata. Uso mock AI con golden dataset.');
+      console.log('⚠️  Gemini API key non configurata. Uso mock AI.');
     }
   }
 
   async parseRecipes(text: string): Promise<{ name: string; people: number }[]> {
-    if (this.openai) {
+    if (this.gemini) {
       try {
-        const response = await this.openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `Sei un assistente che analizza testo in linguaggio naturale e estrae ricette.
+        const prompt = `Sei un assistente che analizza testo in linguaggio naturale e estrae ricette.
 Rispondi SOLO con un JSON array valido. Ogni elemento ha "name" (nome ricetta) e "people" (numero persone, default 2).
-Esempio: [{"name": "Carbonara", "people": 4}]`,
-            },
-            { role: 'user', content: text },
-          ],
-          temperature: 0.3,
-        });
-        const content = response.choices[0]?.message?.content || '[]';
+Esempio: [{"name": "Carbonara", "people": 4}]
+
+Testo: ${text}`;
+        
+        const result = await this.gemini.generateContent(prompt);
+        const content = result.response.text().replace(/```json\n?|```\n?/g, '').trim();
         return JSON.parse(content);
       } catch (error) {
-        console.warn('⚠️  OpenAI parseRecipes fallito, uso mock:', error);
+        console.warn('⚠️  Gemini parseRecipes fallito, uso mock:', error);
       }
     }
 
@@ -46,14 +43,9 @@ Esempio: [{"name": "Carbonara", "people": 4}]`,
   async getIngredients(
     recipes: { name: string; people: number }[],
   ): Promise<{ ingredient: string; quantity: number; unit: string; category: string }[]> {
-    if (this.openai) {
+    if (this.gemini) {
       try {
-        const response = await this.openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `Sei un assistente culinario. Data una lista di ricette, restituisci gli ingredienti necessari.
+        const prompt = `Sei un assistente culinario. Data una lista di ricette, restituisci gli ingredienti necessari.
 Rispondi SOLO con un JSON array. Ogni elemento ha:
 - "ingredient": nome ingrediente
 - "quantity": quantità numerica
@@ -63,16 +55,15 @@ Rispondi SOLO con un JSON array. Ogni elemento ha:
 REGOLE IMPORTANTI:
 1. Se lo stesso ingrediente appare in più ricette, SOMMA le quantità e restituiscilo una sola volta.
 2. Se il nome ricetta contiene "Vegetariana" o "Vegetariano": NON includere MAI carne (guanciale, pancetta, prosciutto, salsiccia, ecc.) o pesce. Usa alternative vegetariane (es: zucchine grigliate, funghi, tofu affumicato).
-3. Se il nome ricetta contiene "Vegana" o "Vegano": NON includere MAI prodotti animali (carne, pesce, uova, latticini, burro, formaggio). Usa alternative vegane.`,
-            },
-            { role: 'user', content: JSON.stringify(recipes) },
-          ],
-          temperature: 0.3,
-        });
-        const content = response.choices[0]?.message?.content || '[]';
+3. Se il nome ricetta contiene "Vegana" o "Vegano": NON includere MAI prodotti animali (carne, pesce, uova, latticini, burro, formaggio). Usa alternative vegane.
+
+Ricette: ${JSON.stringify(recipes)}`;
+        
+        const result = await this.gemini.generateContent(prompt);
+        const content = result.response.text().replace(/```json\n?|```\n?/g, '').trim();
         return JSON.parse(content);
       } catch (error) {
-        console.warn('⚠️  OpenAI getIngredients fallito, uso mock:', error);
+        console.warn('⚠️  Gemini getIngredients fallito, uso mock:', error);
       }
     }
 
@@ -198,48 +189,40 @@ REGOLE IMPORTANTI:
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
-    if (this.openai) {
+    if (this.genAI) {
       try {
-        const response = await this.openai.embeddings.create({
-          model: 'text-embedding-3-small',
-          input: text,
-        });
-        return response.data[0].embedding;
+        const embeddingModel = this.genAI.getGenerativeModel({ model: 'embedding-001' });
+        const result = await embeddingModel.embedContent(text);
+        return result.embedding.values;
       } catch (error) {
-        console.warn('⚠️  OpenAI embedding fallito, uso mock:', error);
+        console.warn('⚠️  Gemini embedding fallito, uso mock:', error);
       }
     }
 
     // Mock: genera un vettore finto per sviluppo
-    return Array.from({ length: 1536 }, () => Math.random() * 2 - 1);
+    return Array.from({ length: 768 }, () => Math.random() * 2 - 1);
   }
 
   async generateVegetarianVersion(
     recipe: { name: string; ingredients: { ingredient: string; quantity: number; unit: string; category: string }[] },
   ): Promise<{ name: string; ingredients: { ingredient: string; quantity: number; unit: string; category: string }[]; description: string }> {
-    if (this.openai) {
+    if (this.gemini) {
       try {
-        const response = await this.openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `Sei un chef esperto di cucina vegetariana. Data una ricetta, crea una versione vegetariana.
+        const prompt = `Sei un chef esperto di cucina vegetariana. Data una ricetta, crea una versione vegetariana.
 Rispondi SOLO con un JSON con:
 - "name": nome della versione vegetariana
 - "description": breve descrizione della variante
 - "ingredients": array con { "ingredient", "quantity" (numero), "unit", "category" }
 
-Sostituisci carne/pesce con alternative vegetariane mantenendo sapore e consistenza simili.`,
-            },
-            { role: 'user', content: JSON.stringify(recipe) },
-          ],
-          temperature: 0.7,
-        });
-        const content = response.choices[0]?.message?.content || '{}';
+Sostituisci carne/pesce con alternative vegetariane mantenendo sapore e consistenza simili.
+
+Ricetta: ${JSON.stringify(recipe)}`;
+        
+        const result = await this.gemini.generateContent(prompt);
+        const content = result.response.text().replace(/```json\n?|```\n?/g, '').trim();
         return JSON.parse(content);
       } catch (error) {
-        console.warn('⚠️  OpenAI vegetarian fallito, uso mock:', error);
+        console.warn('⚠️  Gemini vegetarian fallito, uso mock:', error);
       }
     }
 

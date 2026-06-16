@@ -217,6 +217,14 @@
                 </li>
               }
             </ul>
+            <button
+              type="button"
+              (click)="addSingleRecipeToList({ name: result.original.name, people: result.original.people })"
+              [disabled]="loading()"
+              class="mt-3 w-full bg-amber-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-amber-700 transition disabled:opacity-50 text-sm"
+            >
+              🛒 Aggiungi solo questa alla lista
+            </button>
           </div>
         }
       }
@@ -246,6 +254,14 @@
                 </li>
               }
             </ul>
+            <button
+              type="button"
+              (click)="addSingleRecipeToList({ name: result.vegetarianVersion.name, people: result.original.people })"
+              [disabled]="loading()"
+              class="mt-3 w-full bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-emerald-700 transition disabled:opacity-50 text-sm"
+            >
+              🛒 Aggiungi solo questa alla lista
+            </button>
           </div>
         }
       }
@@ -254,7 +270,7 @@
       @if (activeTab() === 'similar') {
         @for (result of recipeResults(); track result.original.name; let i = $index) {
           <div class="mb-4">
-            <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center justify-between mb-3">
               <h4 class="text-sm font-semibold text-stone-500">Simili a "{{ result.original.name }}":</h4>
               <button
                 type="button"
@@ -268,37 +284,61 @@
             @if (result.similarRecipes.length === 0) {
               <p class="text-stone-400 text-sm italic">Nessuna ricetta simile trovata. Aggiungi più ricette per attivare Vector Search!</p>
             } @else {
-              @for (similar of result.similarRecipes; track similar.name) {
-                <div class="p-3 bg-amber-50/50 rounded-xl mb-2 border border-amber-100">
-                  <div class="flex justify-between items-center">
-                    <span class="font-medium text-stone-800">
+              @for (similar of result.similarRecipes; track trackSimilarRecipe($index, similar)) {
+                <div class="p-4 bg-amber-50/50 rounded-xl mb-3 border border-amber-100">
+                  <!-- Header con nome e score -->
+                  <div class="flex justify-between items-center mb-2">
+                    <span class="font-bold text-stone-800 text-lg">
                       @if (similar.isVegetarian) { 🌱 }
                       {{ similar.name }}
                     </span>
-                    @if (similar.score) {
-                      <span class="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
-                        {{ (similar.score * 100).toFixed(0) }}% match
-                      </span>
-                    }
+                    <div class="flex items-center gap-2">
+                      <span class="text-sm text-stone-500">👥 {{ similar.people }} persone</span>
+                      @if (similar.score) {
+                        <span class="text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                          {{ (similar.score * 100).toFixed(0) }}% match
+                        </span>
+                      }
+                    </div>
                   </div>
                   @if (similar.description) {
-                    <p class="text-xs text-stone-500 mt-1">{{ similar.description }}</p>
+                    <p class="text-sm text-stone-500 mb-3">{{ similar.description }}</p>
                   }
+                  
+                  <!-- Ingredienti -->
+                  <ul class="space-y-1 mb-3">
+                    @for (ing of similar.ingredients; track ing.ingredient) {
+                      <li class="flex justify-between items-center py-1.5 px-3 hover:bg-amber-100 rounded-lg">
+                        <span class="text-stone-700">{{ ing.ingredient }}</span>
+                        <span class="text-sm text-stone-500 bg-white px-2 py-0.5 rounded-full">{{ ing.quantity }} {{ ing.unit }}</span>
+                      </li>
+                    }
+                  </ul>
+                  
+                  <!-- Azioni -->
+                  <div class="flex gap-2">
+                    <button
+                      type="button"
+                      (click)="selectSimilarRecipe(similar, i)"
+                      class="flex-1 bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-emerald-700 transition text-sm"
+                    >
+                      ✨ Usa come ricetta principale
+                    </button>
+                    <button
+                      type="button"
+                      (click)="addSingleRecipeToList({ name: similar.name, people: similar.people })"
+                      [disabled]="loading()"
+                      class="flex-1 bg-amber-600 text-white font-medium py-2 px-4 rounded-lg hover:bg-amber-700 transition disabled:opacity-50 text-sm"
+                    >
+                      🛒 Aggiungi alla lista
+                    </button>
+                  </div>
                 </div>
               }
             }
           </div>
         }
       }
-
-      <!-- Genera lista della spesa -->
-      <button
-        (click)="generateShoppingList()"
-        [disabled]="loading()"
-        class="mt-4 w-full bg-amber-700 text-white font-semibold py-3 px-6 rounded-xl hover:bg-amber-800 transition disabled:opacity-50"
-      >
-        🛒 Genera Lista della Spesa
-      </button>
     </div>
   }
 </div>

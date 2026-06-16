@@ -1,6 +1,6 @@
 import { Component, signal, computed, effect } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { GroceryService, RecipeResult } from '../../services/grocery.service';
+import { GroceryService, RecipeResult, SimilarRecipe } from '../../services/grocery.service';
 import { VoiceService } from '../../services/voice.service';
 
 @Component({
@@ -166,66 +166,6 @@ export class RecipeInputComponent {
     });
   }
 
-  generateShoppingList(replaceList: boolean = false) {
-    // Se la lista esistente non è vuota e non è già stata scelta l'opzione, chiedi all'utente
-    const existingItems = this.groceryService.shoppingList();
-    if (!replaceList && existingItems.length > 0) {
-      const choice = confirm(
-        '📋 Hai già una lista della spesa esistente.\n\n' +
-        'Vuoi SOSTITUIRE la lista esistente con questa nuova?\n\n' +
-        '• OK = Sostituisci (cancella vecchia lista)\n' +
-        '• Annulla = Aggiungi alla lista esistente'
-      );
-      if (choice) {
-        // L'utente ha scelto di sostituire
-        this.generateShoppingList(true);
-        return;
-      }
-      // Altrimenti continua con append
-    }
-    
-    this.loading.set(true);
-    
-    // Usa la versione vegetariana se:
-    // 1. L'utente sta visualizzando il tab vegetariano
-    // 2. Oppure ha selezionato dieta vegetariana/vegana
-    // 3. Oppure ha cercato "vegetariana/vegana" nel testo
-    const diets = this.selectedDiets();
-    const input = this.userInput().toLowerCase();
-    const useVegetarian = 
-      this.activeTab() === 'vegetarian' ||
-      diets.includes('vegetariano') || 
-      diets.includes('vegano') ||
-      input.includes('vegetarian') ||
-      input.includes('vegano') ||
-      input.includes('vegana') ||
-      input.includes('vegan');
-    
-    const recipes = this.recipeResults().map((r) => {
-      if (useVegetarian && r.vegetarianVersion) {
-        return {
-          name: r.vegetarianVersion.name,
-          people: r.original.people,
-        };
-      }
-      return {
-        name: r.original.name,
-        people: r.original.people,
-      };
-    });
-    
-    const append = !replaceList;
-    this.groceryService.generateShoppingList(recipes, append).subscribe({
-      next: () => {
-        this.loading.set(false);
-      },
-      error: () => {
-        this.error.set('Errore nella generazione della lista.');
-        this.loading.set(false);
-      },
-    });
-  }
-
   setTab(tab: 'original' | 'vegetarian' | 'similar') {
     this.activeTab.set(tab);
   }
@@ -233,5 +173,46 @@ export class RecipeInputComponent {
   removeRecipe(index: number) {
     const current = this.recipeResults();
     this.recipeResults.set(current.filter((_, i) => i !== index));
+  }
+
+  // Genera lista per UNA SOLA ricetta
+  addSingleRecipeToList(recipe: { name: string; people: number }) {
+    this.loading.set(true);
+    this.groceryService.generateShoppingList([recipe], true).subscribe({
+      next: () => {
+        this.loading.set(false);
+      },
+      error: () => {
+        this.error.set('Errore nell\'aggiunta alla lista.');
+        this.loading.set(false);
+      },
+    });
+  }
+
+  // Seleziona una ricetta simile e la promuove a ricetta principale
+  selectSimilarRecipe(similar: SimilarRecipe, resultIndex: number) {
+    const current = this.recipeResults();
+    const updated = [...current];
+    
+    // Crea un nuovo RecipeResult con la ricetta simile come originale
+    updated[resultIndex] = {
+      original: {
+        name: similar.name,
+        people: similar.people,
+        ingredients: similar.ingredients,
+      },
+      similarRecipes: current[resultIndex].similarRecipes.filter(r => r.name !== similar.name),
+      vegetarianVersion: similar.isVegetarian 
+        ? { name: similar.name, description: similar.description, ingredients: similar.ingredients }
+        : current[resultIndex].vegetarianVersion,
+    };
+    
+    this.recipeResults.set(updated);
+    this.activeTab.set('original');
+  }
+
+  // Traccia ricette simili per _id o name
+  trackSimilarRecipe(_index: number, similar: SimilarRecipe): string {
+    return similar._id || similar.name;
   }
 }

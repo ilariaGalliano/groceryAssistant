@@ -22,6 +22,16 @@ const isOriginAllowed = (origin?: string): boolean => {
 
   const normalizedOrigin = normalizeOrigin(origin);
 
+  // Consenti richieste da app Capacitor/Cordova (Android e iOS)
+  if (
+    normalizedOrigin.startsWith('capacitor://') ||
+    normalizedOrigin.startsWith('ionic://') ||
+    normalizedOrigin === 'http://localhost' ||
+    normalizedOrigin === 'https://localhost'
+  ) {
+    return true;
+  }
+
   if (process.env.NODE_ENV !== 'production' && normalizedOrigin === 'http://localhost:4200') {
     return true;
   }

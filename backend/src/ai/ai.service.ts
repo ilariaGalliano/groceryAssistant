@@ -22,56 +22,51 @@ export class AiService {
   async parseRecipes(text: string): Promise<{ name: string; people: number }[]> {
     if (this.gemini) {
       try {
-        const prompt = `Sei un assistente che analizza testo in linguaggio naturale e estrae ricette.
-Rispondi SOLO con un JSON array valido. Ogni elemento ha "name" (nome ricetta) e "people" (numero persone, default 2).
+        const prompt = `Sei un assistente che analizza testo in linguaggio naturale e estrae ricette italiane.
+Rispondi SOLO con un JSON array valido senza markdown. Ogni elemento ha:
+- "name": nome della ricetta (stringa non vuota)
+- "people": numero intero di persone (default 2, minimo 1)
 Esempio: [{"name": "Carbonara", "people": 4}]
 
+Se non riesci a identificare ricette, rispondi con []
+
 Testo: ${text}`;
-        
+
         const result = await this.gemini.generateContent(prompt);
-        const content = result.response.text().replace(/```json\n?|```\n?/g, '').trim();
-        return JSON.parse(content);
+        const raw = result.response.text();
+        // Estrai il primo array JSON dalla risposta (gestisce markdown code fences e testo extra)
+        const match = raw.match(/\[[\s\S]*?\]/);
+        if (match) {
+          const validated = this.validateRecipeList(JSON.parse(match[0]));
+          if (validated) return validated;
+        }
       } catch (error) {
-        console.warn('⚠️  Gemini parseRecipes fallito, uso mock:', error);
+        console.warn('⚠️  Gemini parseRecipes fallito, uso fallback:', error);
       }
     }
 
-    // Mock: parsing semplice dal testo
-    return this.mockParseRecipes(text);
+    return this.fallbackParseRecipes(text);
+  }
+
+  private validateRecipeList(parsed: unknown): { name: string; people: number }[] | null {
+    if (!Array.isArray(parsed)) return null;
+    const result = parsed
+      .filter((r): r is Record<string, unknown> => r !== null && typeof r === 'object' && typeof (r as any).name === 'string' && (r as any).name.trim().length > 0)
+      .map(r => ({
+        name: (r.name as string).trim(),
+        people: Math.min(Math.max(Math.round(Number.isFinite(Number(r.people)) ? Number(r.people) : 2), 1), 50),
+      }));
+    return result.length > 0 ? result : null;
   }
 
   async getIngredients(
     recipes: { name: string; people: number }[],
   ): Promise<{ ingredient: string; quantity: number; unit: string; category: string }[]> {
-    if (this.gemini) {
-      try {
-        const prompt = `Sei un assistente culinario. Data una lista di ricette, restituisci gli ingredienti necessari.
-Rispondi SOLO con un JSON array. Ogni elemento ha:
-- "ingredient": nome ingrediente
-- "quantity": quantità numerica
-- "unit": unità di misura (g, ml, pz, cucchiai, ecc.)
-- "category": categoria (carne, latticini, verdure, pasta, spezie, frutta, pesce, altro)
-
-REGOLE IMPORTANTI:
-1. Se lo stesso ingrediente appare in più ricette, SOMMA le quantità e restituiscilo una sola volta.
-2. Se il nome ricetta contiene "Vegetariana" o "Vegetariano": NON includere MAI carne (guanciale, pancetta, prosciutto, salsiccia, ecc.) o pesce. Usa alternative vegetariane (es: zucchine grigliate, funghi, tofu affumicato).
-3. Se il nome ricetta contiene "Vegana" o "Vegano": NON includere MAI prodotti animali (carne, pesce, uova, latticini, burro, formaggio). Usa alternative vegane.
-
-Ricette: ${JSON.stringify(recipes)}`;
-        
-        const result = await this.gemini.generateContent(prompt);
-        const content = result.response.text().replace(/```json\n?|```\n?/g, '').trim();
-        return JSON.parse(content);
-      } catch (error) {
-        console.warn('⚠️  Gemini getIngredients fallito, uso mock:', error);
-      }
-    }
-
-    // Mock: usa database locale di ricette
-    return this.mockGetIngredients(recipes);
+    // Calcolo deterministico dal dataset — nessuna chiamata AI
+    return this.datasetGetIngredients(recipes);
   }
 
-  private mockParseRecipes(text: string): { name: string; people: number }[] {
+  private fallbackParseRecipes(text: string): { name: string; people: number }[] {
     const recipes: { name: string; people: number }[] = [];
     const lower = text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
@@ -108,13 +103,10 @@ Ricette: ${JSON.stringify(recipes)}`;
       }
     }
 
-    if (recipes.length === 0) {
-      recipes.push({ name: 'Carbonara', people: 4 });
-    }
     return recipes;
   }
 
-  private mockGetIngredients(
+  private datasetGetIngredients(
     recipes: { name: string; people: number }[],
   ): { ingredient: string; quantity: number; unit: string; category: string }[] {
     const merged: Record<string, { ingredient: string; quantity: number; unit: string; category: string }> = {};
@@ -206,31 +198,11 @@ Ricette: ${JSON.stringify(recipes)}`;
   async generateVegetarianVersion(
     recipe: { name: string; ingredients: { ingredient: string; quantity: number; unit: string; category: string }[] },
   ): Promise<{ name: string; ingredients: { ingredient: string; quantity: number; unit: string; category: string }[]; description: string }> {
-    if (this.gemini) {
-      try {
-        const prompt = `Sei un chef esperto di cucina vegetariana. Data una ricetta, crea una versione vegetariana.
-Rispondi SOLO con un JSON con:
-- "name": nome della versione vegetariana
-- "description": breve descrizione della variante
-- "ingredients": array con { "ingredient", "quantity" (numero), "unit", "category" }
-
-Sostituisci carne/pesce con alternative vegetariane mantenendo sapore e consistenza simili.
-
-Ricetta: ${JSON.stringify(recipe)}`;
-        
-        const result = await this.gemini.generateContent(prompt);
-        const content = result.response.text().replace(/```json\n?|```\n?/g, '').trim();
-        return JSON.parse(content);
-      } catch (error) {
-        console.warn('⚠️  Gemini vegetarian fallito, uso mock:', error);
-      }
-    }
-
-    // Mock: versione vegetariana
-    return this.mockVegetarianVersion(recipe);
+    // Versione vegetariana deterministica — nessuna chiamata AI
+    return this.deterministicVegetarianVersion(recipe);
   }
 
-  private mockVegetarianVersion(
+  private deterministicVegetarianVersion(
     recipe: { name: string; ingredients: { ingredient: string; quantity: number; unit: string; category: string }[] },
   ): { name: string; ingredients: { ingredient: string; quantity: number; unit: string; category: string }[]; description: string } {
     const meatSubstitutes: Record<string, { ingredient: string; category: string }> = {

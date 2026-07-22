@@ -19,37 +19,41 @@ export class RecipesService {
    * 3. AI genera versione vegetariana
    * 4. Ritorna tutto per la UI dinamica
    */
-  async processRequest(text: string, userId: string) {
-    // Step 1: OpenAI interpreta la richiesta
-    const parsedRecipes = await this.aiService.parseRecipes(text);
+  async processRequest(text: string, userId: string, preferences?: { diets?: string[]; budget?: string; mealType?: string }) {
+    // Step 1: Gemini interpreta la richiesta (1 chiamata totale per request)
+    const parsedRecipes = await this.aiService.parseRecipes(text, preferences);
 
     // Step 2: Per ogni ricetta, cerca simili con Vector Search
     const results = await Promise.all(
       parsedRecipes.map(async (recipe) => {
-        const ingredients = await this.aiService.getIngredients([recipe]);
+        const ingredients = await this.aiService.getIngredients([recipe], preferences);
 
-        // Genera embedding per la ricetta
+        // Genera embedding per la ricetta (può essere null se Gemini non è disponibile)
         const recipeText = `${recipe.name} ${ingredients.map((i) => i.ingredient).join(' ')}`;
         const embedding = await this.aiService.generateEmbedding(recipeText);
 
-        // Salva la ricetta con embedding in MongoDB
+        // Salva la ricetta in MongoDB (embedding solo se disponibile)
+        const recipeUpdate: Record<string, unknown> = {
+          name: recipe.name,
+          people: recipe.people,
+          ingredients,
+          description: `${recipe.name} per ${recipe.people} persone`,
+          userId,
+        };
+        if (embedding !== null) recipeUpdate.embedding = embedding;
+
         const savedRecipe = await this.recipeModel.findOneAndUpdate(
           { name: recipe.name, people: recipe.people, userId },
-          {
-            name: recipe.name,
-            people: recipe.people,
-            ingredients,
-            embedding,
-            description: `${recipe.name} per ${recipe.people} persone`,
-            userId,
-          },
+          recipeUpdate,
           { upsert: true, new: true },
         );
 
-        // Vector Search: cerca ricette semanticamente simili
-        const similarRecipes = await this.vectorSearch(embedding, String(savedRecipe._id), userId);
+        // Vector Search: eseguito solo se l'embedding è disponibile
+        const similarRecipes = embedding !== null
+          ? await this.vectorSearch(embedding, String(savedRecipe._id), userId)
+          : [];
 
-        // Step 3: Genera versione vegetariana
+        // Step 3: Genera versione vegetariana (deterministica)
         const vegetarianVersion = await this.aiService.generateVegetarianVersion({
           name: recipe.name,
           ingredients,
@@ -59,18 +63,20 @@ export class RecipesService {
         const vegEmbeddingText = `${vegetarianVersion.name} vegetariana ${vegetarianVersion.ingredients.map((i) => i.ingredient).join(' ')}`;
         const vegEmbedding = await this.aiService.generateEmbedding(vegEmbeddingText);
 
+        const vegUpdate: Record<string, unknown> = {
+          name: vegetarianVersion.name,
+          people: recipe.people,
+          ingredients: vegetarianVersion.ingredients,
+          description: vegetarianVersion.description,
+          isVegetarian: true,
+          originalRecipeId: String(savedRecipe._id),
+          userId,
+        };
+        if (vegEmbedding !== null) vegUpdate.embedding = vegEmbedding;
+
         await this.recipeModel.findOneAndUpdate(
           { name: vegetarianVersion.name, isVegetarian: true, userId },
-          {
-            name: vegetarianVersion.name,
-            people: recipe.people,
-            ingredients: vegetarianVersion.ingredients,
-            embedding: vegEmbedding,
-            description: vegetarianVersion.description,
-            isVegetarian: true,
-            originalRecipeId: String(savedRecipe._id),
-            userId,
-          },
+          vegUpdate,
           { upsert: true, new: true },
         );
 
@@ -159,6 +165,7 @@ export class RecipesService {
 
   async searchSimilar(text: string, userId: string) {
     const embedding = await this.aiService.generateEmbedding(text);
+    if (embedding === null) return [];
     return this.vectorSearch(embedding, undefined, userId);
   }
 

@@ -17,12 +17,12 @@ export class RecipesController {
 
   @Post('parse')
   async parseRecipes(@Body() dto: TextInputDto) {
-    return this.aiService.parseRecipes(dto.text);
+    return this.aiService.parseRecipes(dto.text, dto.preferences);
   }
 
   @Post('process')
   async processRequest(@Req() req: AuthRequest, @Body() dto: TextInputDto) {
-    return this.recipesService.processRequest(dto.text, req.user.userId);
+    return this.recipesService.processRequest(dto.text, req.user.userId, dto.preferences);
   }
 
   @Post('search')

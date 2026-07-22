@@ -19,22 +19,31 @@ export class AiService {
     }
   }
 
-  async parseRecipes(text: string): Promise<{ name: string; people: number }[]> {
+  async parseRecipes(text: string, preferences?: { diets?: string[]; budget?: string; mealType?: string }): Promise<{ name: string; people: number }[]> {
     if (this.gemini) {
       try {
+        const dietSection = preferences?.diets?.length
+          ? `\n### Vincoli dieta (NON ignorare)\n${preferences.diets.map(d => `- ${d}`).join('\n')}`
+          : '';
+        const budgetSection = preferences?.budget
+          ? `\n### Budget: ${preferences.budget}`
+          : '';
+        const mealSection = preferences?.mealType
+          ? `\n### Tipo pasto: ${preferences.mealType}`
+          : '';
+
         const prompt = `Sei un assistente che analizza testo in linguaggio naturale e estrae ricette italiane.
 Rispondi SOLO con un JSON array valido senza markdown. Ogni elemento ha:
 - "name": nome della ricetta (stringa non vuota)
 - "people": numero intero di persone (default 2, minimo 1)
 Esempio: [{"name": "Carbonara", "people": 4}]
 
-Se non riesci a identificare ricette, rispondi con []
+Se non riesci a identificare ricette, rispondi con []${dietSection}${budgetSection}${mealSection}
 
 Testo: ${text}`;
 
         const result = await this.gemini.generateContent(prompt);
         const raw = result.response.text();
-        // Estrai il primo array JSON dalla risposta (gestisce markdown code fences e testo extra)
         const match = raw.match(/\[[\s\S]*?\]/);
         if (match) {
           const validated = this.validateRecipeList(JSON.parse(match[0]));
@@ -61,9 +70,10 @@ Testo: ${text}`;
 
   async getIngredients(
     recipes: { name: string; people: number }[],
+    preferences?: { diets?: string[]; budget?: string; mealType?: string },
   ): Promise<{ ingredient: string; quantity: number; unit: string; category: string }[]> {
     // Calcolo deterministico dal dataset — nessuna chiamata AI
-    return this.datasetGetIngredients(recipes);
+    return this.datasetGetIngredients(recipes, preferences);
   }
 
   private fallbackParseRecipes(text: string): { name: string; people: number }[] {
@@ -108,6 +118,7 @@ Testo: ${text}`;
 
   private datasetGetIngredients(
     recipes: { name: string; people: number }[],
+    preferences?: { diets?: string[]; budget?: string; mealType?: string },
   ): { ingredient: string; quantity: number; unit: string; category: string }[] {
     const merged: Record<string, { ingredient: string; quantity: number; unit: string; category: string }> = {};
 
@@ -122,10 +133,15 @@ Testo: ${text}`;
       'prosciutto': { ingredient: 'zucchine', quantity: 150, unit: 'g', category: 'verdure' },
     };
 
+    // Dieta ricavata sia dal nome ricetta che dalle preferenze esplicite dell'utente
+    const prefDiets = preferences?.diets?.map(d => d.toLowerCase()) ?? [];
+    const prefIsVegetarian = prefDiets.some(d => d.includes('vegetarian'));
+    const prefIsVegan = prefDiets.some(d => d.includes('vegan'));
+
     for (const recipe of recipes) {
       const recipeLower = recipe.name.toLowerCase();
-      const isVegetarian = recipeLower.includes('vegetarian') || recipeLower.includes('vegano') || recipeLower.includes('vegana');
-      const isVegan = recipeLower.includes('vegano') || recipeLower.includes('vegana') || recipeLower.includes('vegan');
+      const isVegan = prefIsVegan || recipeLower.includes('vegano') || recipeLower.includes('vegana') || recipeLower.includes('vegan');
+      const isVegetarian = isVegan || prefIsVegetarian || recipeLower.includes('vegetarian');
       
       // Rimuovi suffissi per trovare la ricetta base
       const baseName = recipe.name
@@ -180,19 +196,18 @@ Testo: ${text}`;
     return Object.values(merged);
   }
 
-  async generateEmbedding(text: string): Promise<number[]> {
+  async generateEmbedding(text: string): Promise<number[] | null> {
     if (this.genAI) {
       try {
         const embeddingModel = this.genAI.getGenerativeModel({ model: 'embedding-001' });
         const result = await embeddingModel.embedContent(text);
         return result.embedding.values;
       } catch (error) {
-        console.warn('⚠️  Gemini embedding fallito, uso mock:', error);
+        console.warn('⚠️  Gemini embedding fallito:', error);
       }
     }
-
-    // Mock: genera un vettore finto per sviluppo
-    return Array.from({ length: 768 }, () => Math.random() * 2 - 1);
+    // Senza embedding valido il vector search non può produrre risultati semanticamente affidabili.
+    return null;
   }
 
   async generateVegetarianVersion(

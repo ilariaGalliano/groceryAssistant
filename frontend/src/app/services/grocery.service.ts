@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
+import { Observable, tap, catchError, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
 
 export interface ParsedRecipe {
@@ -51,6 +51,12 @@ export interface ProcessResponse {
   recipes: RecipeResult[];
 }
 
+export interface RecipePreferences {
+  diets: string[];
+  budget: string;
+  mealType: string;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -63,21 +69,16 @@ export class GroceryService {
 
   constructor(private http: HttpClient) {}
 
-  parseRecipes(input: string): Observable<ParsedRecipe[]> {
+  parseRecipes(input: string, preferences?: RecipePreferences): Observable<ParsedRecipe[]> {
     return this.http.post<ParsedRecipe[]>(`${this.apiUrl}/recipes/parse`, {
       text: input,
+      preferences,
     });
   }
 
-  /**
-   * Flusso completo:
-   * 1. OpenAI interpreta richiesta
-   * 2. MongoDB Vector Search cerca ricette simili
-   * 3. AI genera versione vegetariana
-   */
-  processRecipes(input: string): Observable<ProcessResponse> {
+  processRecipes(input: string, preferences?: RecipePreferences): Observable<ProcessResponse> {
     return this.http
-      .post<ProcessResponse>(`${this.apiUrl}/recipes/process`, { text: input })
+      .post<ProcessResponse>(`${this.apiUrl}/recipes/process`, { text: input, preferences })
       .pipe(tap((response) => this.processedRecipes.set(response.recipes)));
   }
 
@@ -98,30 +99,54 @@ export class GroceryService {
   }
 
   toggleDone(ingredient: string) {
+    const snapshot = this.shoppingList();
     this.shoppingList.set(
-      this.shoppingList().map((i) =>
-        i.ingredient === ingredient ? { ...i, isDone: !i.isDone } : i
-      )
+      snapshot.map((i) => i.ingredient === ingredient ? { ...i, isDone: !i.isDone } : i)
     );
-    this.http.patch<ShoppingList>(`${this.apiUrl}/shopping-list/toggle-done`, { ingredient }).subscribe();
+    this.http
+      .patch<ShoppingList>(`${this.apiUrl}/shopping-list/toggle-done`, { ingredient })
+      .pipe(catchError((err) => { this.shoppingList.set(snapshot); return throwError(() => err); }))
+      .subscribe();
   }
 
   removeFromList(ingredient: string) {
-    this.shoppingList.set(this.shoppingList().filter((i) => i.ingredient !== ingredient));
-    this.http.patch(`${this.apiUrl}/shopping-list/remove-item`, { ingredient }).subscribe();
+    const snapshot = this.shoppingList();
+    this.shoppingList.set(snapshot.filter((i) => i.ingredient !== ingredient));
+    this.http
+      .patch(`${this.apiUrl}/shopping-list/remove-item`, { ingredient })
+      .pipe(catchError((err) => { this.shoppingList.set(snapshot); return throwError(() => err); }))
+      .subscribe();
   }
 
   addToList(item: Ingredient) {
-    const existing = this.shoppingList().find((i) => i.ingredient === item.ingredient);
+    const snapshot = this.shoppingList();
+    // Ottimistic update
+    const existing = snapshot.find((i) => i.ingredient.toLowerCase() === item.ingredient.toLowerCase());
     if (existing) {
       this.shoppingList.set(
-        this.shoppingList().map((i) =>
-          i.ingredient === item.ingredient ? { ...i, quantity: i.quantity + item.quantity } : i
+        snapshot.map((i) =>
+          i.ingredient.toLowerCase() === item.ingredient.toLowerCase()
+            ? { ...i, quantity: i.quantity + item.quantity }
+            : i
         )
       );
     } else {
-      this.shoppingList.set([...this.shoppingList(), item]);
+      this.shoppingList.set([...snapshot, { ...item, isDone: false }]);
     }
+
+    // Persist sul backend con rollback in caso di errore
+    this.http
+      .patch<ShoppingList>(`${this.apiUrl}/shopping-list/add-item`, {
+        ingredient: item.ingredient,
+        quantity: item.quantity,
+        unit: item.unit,
+        category: item.category,
+      })
+      .pipe(
+        tap((list) => this.shoppingList.set(list.items)),
+        catchError((err) => { this.shoppingList.set(snapshot); return throwError(() => err); }),
+      )
+      .subscribe();
   }
 
   clearAll(): Observable<{ items: never[], createdAt: null }> {

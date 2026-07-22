@@ -144,4 +144,19 @@ export class ShoppingListService {
     await this.shoppingListModel.deleteMany({ userId });
     return { items: [], createdAt: null };
   }
+
+  async addItem(userId: string, item: { ingredient: string; quantity: number; unit: string; category: string }) {
+    const list = await this.shoppingListModel.findOne({ userId }).sort({ createdAt: -1 }).exec();
+
+    if (list) {
+      list.items = mergeItems(list.items as Item[], [item]);
+      list.updatedAt = new Date();
+      await list.save();
+      return { items: list.items, createdAt: list.createdAt };
+    }
+
+    const newList = new this.shoppingListModel({ userId, items: [{ ...item, isDone: false }] });
+    await newList.save();
+    return { items: newList.items, createdAt: newList.createdAt };
+  }
 }

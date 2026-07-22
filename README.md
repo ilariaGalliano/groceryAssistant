@@ -16,7 +16,7 @@ Un'app che:
 
 ### Frontend
 
-- Angular 22 (Standalone, Signals)
+- Angular 18 (Standalone, Signals)
 - TailwindCSS
 - Angular CDK
 - RxJS (solo async complessi)
@@ -31,7 +31,7 @@ Un'app che:
 
 ### AI
 
-- OpenAI Platform oppure Pi.ai Developer Platform
+- Google Gemini (gemini-1.5-flash + embedding-001)
 
 ---
 
@@ -45,7 +45,7 @@ NestJS API
  ┌──────────────┬─────────────┐
  ↓              ↓             ↓
 AI Service    MongoDB     Vector Search
-(OpenAI)        Atlas       Embeddings
+(Gemini)        Atlas       Embeddings
 ```
 
 ---

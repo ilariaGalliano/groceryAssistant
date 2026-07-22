@@ -2,7 +2,7 @@ import { Controller, Post, Get, Patch, Delete, Body, UseGuards, Req } from '@nes
 import { Request } from 'express';
 import { ShoppingListService } from './shopping-list.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { GenerateListDto, ToggleDoneDto } from '../common/dto/input.dto';
+import { AddItemDto, GenerateListDto, ToggleDoneDto } from '../common/dto/input.dto';
 
 type AuthRequest = Request & { user: { userId: string } };
 
@@ -19,6 +19,11 @@ export class ShoppingListController {
   @Get()
   async getLatest(@Req() req: AuthRequest) {
     return this.shoppingListService.getLatest(req.user.userId);
+  }
+
+  @Patch('add-item')
+  async addItem(@Req() req: AuthRequest, @Body() dto: AddItemDto) {
+    return this.shoppingListService.addItem(req.user.userId, dto);
   }
 
   @Patch('toggle-done')

@@ -59,7 +59,8 @@ export class RecipeInputComponent {
   };
   selectedBudget = signal('medio');
 
-  // Computed: full prompt combining all options
+  // Il testo inviato al backend contiene solo l'input utente e il numero persone.
+  // Dieta e budget viaggiano come oggetto strutturato separato.
   fullPrompt = computed(() => {
     const parts: string[] = [];
     const input = this.userInput();
@@ -67,14 +68,6 @@ export class RecipeInputComponent {
       parts.push(input);
     }
     parts.push(`per ${this.people()} persone`);
-    parts.push(`(${this.selectedMealType()})`);
-
-    const diets = this.selectedDiets();
-    if (diets.length > 0) {
-      parts.push(`- preferenze: ${diets.join(', ')}`);
-    }
-
-    parts.push(`- budget: ${this.selectedBudget()}`);
     return parts.join(' ');
   });
 
@@ -137,7 +130,13 @@ export class RecipeInputComponent {
     this.loading.set(true);
     this.error.set('');
 
-    this.groceryService.processRecipes(prompt).subscribe({
+    const preferences = {
+      diets: this.selectedDiets(),
+      budget: this.selectedBudget(),
+      mealType: this.selectedMealType(),
+    };
+
+    this.groceryService.processRecipes(prompt, preferences).subscribe({
       next: (response) => {
         this.recipeResults.set(response.recipes);
         this.loading.set(false);

@@ -12,13 +12,13 @@ export class ShoppingListService {
     private aiService: AiService,
   ) {}
 
-  async generate(recipes: { name: string; people: number }[], append: boolean = true) {
+  async generate(userId: string, recipes: { name: string; people: number }[], append: boolean = true) {
     const newItems = await this.aiService.getIngredients(recipes);
 
     if (append) {
       // Recupera lista esistente e merge ingredienti
       const existingList = await this.shoppingListModel
-        .findOne()
+        .findOne({ userId })
         .sort({ createdAt: -1 })
         .exec();
 
@@ -50,6 +50,7 @@ export class ShoppingListService {
 
     // Crea nuova lista se non esiste o append=false
     const shoppingList = new this.shoppingListModel({ 
+      userId,
       items: newItems.map(i => ({ ...i, isDone: false })) 
     });
     await shoppingList.save();
@@ -57,9 +58,9 @@ export class ShoppingListService {
     return { items: shoppingList.items, createdAt: shoppingList.createdAt };
   }
 
-  async getLatest() {
+  async getLatest(userId: string) {
     const list = await this.shoppingListModel
-      .findOne()
+      .findOne({ userId })
       .sort({ createdAt: -1 })
       .exec();
 
@@ -69,9 +70,9 @@ export class ShoppingListService {
     return { items: list.items, createdAt: list.createdAt };
   }
 
-  async toggleDone(ingredient: string) {
+  async toggleDone(userId: string, ingredient: string) {
     const list = await this.shoppingListModel
-      .findOne()
+      .findOne({ userId })
       .sort({ createdAt: -1 })
       .exec();
 
@@ -85,9 +86,9 @@ export class ShoppingListService {
     return { items: list.items, createdAt: list.createdAt };
   }
 
-  async removeItem(ingredient: string) {
+  async removeItem(userId: string, ingredient: string) {
     const list = await this.shoppingListModel
-      .findOne()
+      .findOne({ userId })
       .sort({ createdAt: -1 })
       .exec();
 
@@ -99,8 +100,8 @@ export class ShoppingListService {
     return { items: list.items, createdAt: list.createdAt };
   }
 
-  async clearAll() {
-    await this.shoppingListModel.deleteMany({});
+  async clearAll(userId: string) {
+    await this.shoppingListModel.deleteMany({ userId });
     return { items: [], createdAt: null };
   }
 }

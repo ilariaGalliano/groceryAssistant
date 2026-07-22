@@ -20,12 +20,15 @@ import { MongoMemoryServer } from 'mongodb-memory-server';
         const useMemory = config.get<string>('USE_MEMORY_DB') === 'true';
         const uri = config.get<string>('MONGODB_URI');
 
-        if (!useMemory && uri && uri.length > 0) {
+        if (!useMemory) {
+          if (!uri) {
+            throw new Error('MONGODB_URI environment variable is required but not set. Set USE_MEMORY_DB=true to use in-memory database for local development.');
+          }
           console.log('🌐 Connessione a MongoDB Atlas...');
           return { uri };
         }
 
-        // MongoDB in-memory per sviluppo/test locale
+        // MongoDB in-memory solo se USE_MEMORY_DB=true (sviluppo/test locale)
         const mongod = await MongoMemoryServer.create();
         const memUri = mongod.getUri();
         console.log('⚡ Usando MongoDB in-memory:', memUri);

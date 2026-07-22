@@ -6,6 +6,9 @@ export class ShoppingList extends Document {
   declare createdAt: Date;
   declare updatedAt: Date;
 
+  @Prop({ required: true, index: true })
+  userId!: string;
+
   @Prop({
     type: [
       {

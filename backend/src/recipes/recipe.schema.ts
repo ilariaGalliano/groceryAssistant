@@ -3,6 +3,9 @@ import { Document } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Recipe extends Document {
+  @Prop({ required: true, index: true })
+  userId!: string;
+
   @Prop({ required: true })
   name!: string;
 

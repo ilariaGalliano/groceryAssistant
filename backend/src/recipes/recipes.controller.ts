@@ -1,8 +1,11 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { AiService } from '../ai/ai.service';
 import { RecipesService } from './recipes.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { TextInputDto } from '../common/dto/input.dto';
+
+type AuthRequest = Request & { user: { userId: string } };
 
 @Controller('api/recipes')
 @UseGuards(JwtAuthGuard)
@@ -17,28 +20,18 @@ export class RecipesController {
     return this.aiService.parseRecipes(dto.text);
   }
 
-  /**
-   * Flusso completo:
-   * 1. OpenAI interpreta richiesta
-   * 2. MongoDB Vector Search cerca ricette simili
-   * 3. AI genera versione vegetariana
-   * 4. Ritorna dati per UI dinamica
-   */
   @Post('process')
-  async processRequest(@Body() dto: TextInputDto) {
-    return this.recipesService.processRequest(dto.text);
+  async processRequest(@Req() req: AuthRequest, @Body() dto: TextInputDto) {
+    return this.recipesService.processRequest(dto.text, req.user.userId);
   }
 
-  /**
-   * Cerca ricette semanticamente simili via Vector Search
-   */
   @Post('search')
-  async searchSimilar(@Body() dto: TextInputDto) {
-    return this.recipesService.searchSimilar(dto.text);
+  async searchSimilar(@Req() req: AuthRequest, @Body() dto: TextInputDto) {
+    return this.recipesService.searchSimilar(dto.text, req.user.userId);
   }
 
   @Get()
-  async getAllRecipes() {
-    return this.recipesService.getAllRecipes();
+  async getAllRecipes(@Req() req: AuthRequest) {
+    return this.recipesService.getAllRecipes(req.user.userId);
   }
 }

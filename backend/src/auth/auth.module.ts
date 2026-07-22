@@ -17,16 +17,12 @@ import { User, UserSchema } from './user.schema';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService): JwtModuleOptions => {
-        const secret = config.get<string>('JWT_SECRET') || 'grocery-planner-secret-key';
-        const expiresIn = config.get<string>('JWT_EXPIRES_IN');
-
-        // If JWT_EXPIRES_IN is empty/undefined, token remains valid until explicit logout.
-        const options: JwtModuleOptions = { secret };
-        if (expiresIn && expiresIn.trim().length > 0) {
-          options.signOptions = { expiresIn: expiresIn as StringValue };
+        const secret = config.get<string>('JWT_SECRET');
+        if (!secret) {
+          throw new Error('JWT_SECRET environment variable is required but not set.');
         }
-
-        return options;
+        const expiresIn = (config.get<string>('JWT_EXPIRES_IN') ?? '1h') as StringValue;
+        return { secret, signOptions: { expiresIn } };
       },
     }),
   ],

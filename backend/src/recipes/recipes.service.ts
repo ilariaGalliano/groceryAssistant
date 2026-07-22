@@ -19,7 +19,7 @@ export class RecipesService {
    * 3. AI genera versione vegetariana
    * 4. Ritorna tutto per la UI dinamica
    */
-  async processRequest(text: string) {
+  async processRequest(text: string, userId: string) {
     // Step 1: OpenAI interpreta la richiesta
     const parsedRecipes = await this.aiService.parseRecipes(text);
 
@@ -34,19 +34,20 @@ export class RecipesService {
 
         // Salva la ricetta con embedding in MongoDB
         const savedRecipe = await this.recipeModel.findOneAndUpdate(
-          { name: recipe.name, people: recipe.people },
+          { name: recipe.name, people: recipe.people, userId },
           {
             name: recipe.name,
             people: recipe.people,
             ingredients,
             embedding,
             description: `${recipe.name} per ${recipe.people} persone`,
+            userId,
           },
           { upsert: true, new: true },
         );
 
         // Vector Search: cerca ricette semanticamente simili
-        const similarRecipes = await this.vectorSearch(embedding, String(savedRecipe._id));
+        const similarRecipes = await this.vectorSearch(embedding, String(savedRecipe._id), userId);
 
         // Step 3: Genera versione vegetariana
         const vegetarianVersion = await this.aiService.generateVegetarianVersion({
@@ -59,7 +60,7 @@ export class RecipesService {
         const vegEmbedding = await this.aiService.generateEmbedding(vegEmbeddingText);
 
         await this.recipeModel.findOneAndUpdate(
-          { name: vegetarianVersion.name, isVegetarian: true },
+          { name: vegetarianVersion.name, isVegetarian: true, userId },
           {
             name: vegetarianVersion.name,
             people: recipe.people,
@@ -68,6 +69,7 @@ export class RecipesService {
             description: vegetarianVersion.description,
             isVegetarian: true,
             originalRecipeId: String(savedRecipe._id),
+            userId,
           },
           { upsert: true, new: true },
         );
@@ -91,7 +93,7 @@ export class RecipesService {
    * MongoDB Atlas Vector Search
    * Cerca ricette con embedding simili usando $vectorSearch
    */
-  async vectorSearch(queryEmbedding: number[], excludeId?: string): Promise<any[]> {
+  async vectorSearch(queryEmbedding: number[], excludeId?: string, userId?: string): Promise<any[]> {
     try {
       const collection = this.connection.collection('recipes');
 
@@ -105,6 +107,7 @@ export class RecipesService {
             limit: 5,
           },
         },
+        ...(userId ? [{ $match: { userId } }] : []),
         {
           $project: {
             name: 1,
@@ -129,17 +132,20 @@ export class RecipesService {
     } catch (error) {
       // Se Vector Search non è configurato (es. in-memory DB), ritorna array vuoto
       console.warn('⚠️  Vector Search non disponibile:', error.message);
-      return this.fallbackSimilarSearch(excludeId);
+      return this.fallbackSimilarSearch(excludeId, userId);
     }
   }
 
   /**
    * Fallback: ricerca semplice quando Vector Search non è disponibile
    */
-  private async fallbackSimilarSearch(excludeId?: string): Promise<any[]> {
+  private async fallbackSimilarSearch(excludeId?: string, userId?: string): Promise<any[]> {
     const query: any = {};
     if (excludeId) {
       query._id = { $ne: excludeId };
+    }
+    if (userId) {
+      query.userId = userId;
     }
 
     return this.recipeModel
@@ -151,17 +157,14 @@ export class RecipesService {
       .exec();
   }
 
-  /**
-   * Cerca ricette per testo usando Vector Search semantico
-   */
-  async searchSimilar(text: string) {
+  async searchSimilar(text: string, userId: string) {
     const embedding = await this.aiService.generateEmbedding(text);
-    return this.vectorSearch(embedding);
+    return this.vectorSearch(embedding, undefined, userId);
   }
 
-  async getAllRecipes() {
+  async getAllRecipes(userId: string) {
     return this.recipeModel
-      .find()
+      .find({ userId })
       .select('-embedding')
       .sort({ createdAt: -1 })
       .lean()

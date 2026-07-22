@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.foodeasylist.app',
+  appId: 'com.foodeasylist.android',
   appName: 'FoodEasyList',
   webDir: 'dist/frontend/browser',
   server: {

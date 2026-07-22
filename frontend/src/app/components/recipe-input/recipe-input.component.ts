@@ -159,8 +159,12 @@ export class RecipeInputComponent {
           this.activeTab.set('original');
         }
       },
-      error: () => {
-        this.error.set('Errore nel processamento delle ricette. Riprova.');
+      error: (err) => {
+        if (err?.status === 0) {
+          this.error.set('Errore di connessione/CORS con il backend locale. Controlla che backend sia avviato e CORS configurato.');
+        } else {
+          this.error.set(err?.error?.message || 'Errore nel processamento delle ricette. Riprova.');
+        }
         this.loading.set(false);
       },
     });

@@ -3,40 +3,36 @@ import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL || '',
-  process.env.FRONTEND_PREVIEW_URL || '',
-].filter(Boolean);
+const normalizeOrigin = (value: string): string => value.trim().replace(/\/+$/, '');
 
-const normalizeOrigin = (value: string): string => value.trim().replace(/\/$/, '');
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_PREVIEW_URL,
+  'capacitor://localhost',
+]
+  .filter((value): value is string => Boolean(value))
+  .map(normalizeOrigin);
+
+const isLocalDevelopmentOrigin = (origin: string): boolean => {
+  try {
+    const url = new URL(origin);
+    if (!['http:', 'https:'].includes(url.protocol)) return false;
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+  } catch {
+    return false;
+  }
+};
 
 const isOriginAllowed = (origin?: string): boolean => {
-  if (!origin) {
-    return true;
-  }
+  if (!origin) return true; // client non-browser / server-to-server
 
   const normalizedOrigin = normalizeOrigin(origin);
 
-  // Consenti richieste da app Capacitor/Cordova (Android e iOS)
-  if (
-    normalizedOrigin.startsWith('capacitor://') ||
-    normalizedOrigin.startsWith('ionic://') ||
-    normalizedOrigin === 'http://localhost' ||
-    normalizedOrigin === 'https://localhost'
-  ) {
+  if (allowedOrigins.includes(normalizedOrigin)) {
     return true;
   }
 
-  if (process.env.NODE_ENV !== 'production' && normalizedOrigin === 'http://localhost:4200') {
-    return true;
-  }
-
-  const normalizedAllowedOrigins = allowedOrigins.map(normalizeOrigin);
-  if (normalizedAllowedOrigins.includes(normalizedOrigin)) {
-    return true;
-  }
-
-  return false;
+  return process.env.NODE_ENV !== 'production' && isLocalDevelopmentOrigin(normalizedOrigin);
 };
 
 async function bootstrap() {

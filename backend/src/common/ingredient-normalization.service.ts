@@ -86,9 +86,21 @@ export class IngredientNormalizationService {
    * - isDone flag on existing items is preserved.
    */
   mergeItems(existing: ListItem[], incoming: NormalizedIngredient[]): ListItem[] {
-    const merged: ListItem[] = existing.map(i => ({ ...i }));
+    // Converti a plain object: i subdocument Mongoose richiedono .toObject()
+    // altrimenti lo spread { ...i } non copia i campi dati.
+    const toPlain = (i: unknown): ListItem => {
+      const plain = (i != null && typeof (i as any).toObject === 'function')
+        ? (i as any).toObject()
+        : { ...(i as object) };
+      return plain as ListItem;
+    };
+
+    const merged: ListItem[] = existing
+      .map(toPlain)
+      .filter(i => typeof i?.ingredient === 'string' && i.ingredient.length > 0);
 
     for (const item of incoming) {
+      if (typeof item?.ingredient !== 'string' || item.ingredient.length === 0) continue;
       const inNorm = this.normalizeUnit(item.quantity, item.unit);
       const idx = merged.findIndex(
         m =>

@@ -12,7 +12,7 @@ export class AiService {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
     if (apiKey && apiKey.length > 10) {
       this.genAI = new GoogleGenerativeAI(apiKey);
-      this.gemini = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      this.gemini = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
       console.log('✅ Gemini AI configurato correttamente.');
     } else {
       console.log('⚠️  Gemini API key non configurata. Uso mock AI.');
@@ -199,7 +199,7 @@ Testo: ${text}`;
   async generateEmbedding(text: string): Promise<number[] | null> {
     if (this.genAI) {
       try {
-        const embeddingModel = this.genAI.getGenerativeModel({ model: 'embedding-001' });
+        const embeddingModel = this.genAI.getGenerativeModel({ model: 'gemini-embedding-001' });
         const result = await embeddingModel.embedContent(text);
         return result.embedding.values;
       } catch (error) {
